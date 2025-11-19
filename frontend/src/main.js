@@ -1,3 +1,4 @@
+import './assets/style.css' //глобальные стили так подключать вроде
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
