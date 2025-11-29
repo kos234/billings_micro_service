@@ -11,6 +11,8 @@ import java.util.List;
 @NoArgsConstructor
 @Builder
 public class BillingFilter {
+    @Builder.Default
     private Integer serviceId = null;
+    @Builder.Default
     private List<BillingStates> states = List.of();
 }
