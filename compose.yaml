@@ -26,5 +26,14 @@ services:
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update # Чтобы таблицы создались автоматически
     restart: on-failure
 
+  frontend:
+      build:
+        context: frontend # Указываем папку, где лежит Dockerfile
+      depends_on:
+        - backend
+      ports:
+        - "8090:80"
+      restart: on-failure
+
 volumes:
   postgres_data:

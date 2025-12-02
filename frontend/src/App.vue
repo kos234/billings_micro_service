@@ -1,18 +1,31 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
+import {pingBackend} from "./api.js"
+import {onMounted, ref} from "vue";
+
+const count = ref(0)
+
+console.log("script")
+
+onMounted(() => {
+  console.log("onMounted")
+    pingBackend()
+        .then(res => res.text().then())
+        .then(text => console.log(text))
+        .catch(e => console.log(e))
+})
 </script>
 
 <template>
   <header>
-    <h1>Личный кабинет</h1>
+    <h1>Личный кабинет 33333</h1>
   </header>
 
   <!-- Баланс и задолженность -->
   <div class="summary-cards">
     <div class="card">
       <div class="card-title">Баланс аккаунта</div>
-      <div class="card-value">12 500 ₽</div>
+<!--      <div class="card-value">12 500 ₽</div>-->
+      <div class="card-value">{{count}}</div>
     </div>
     <div class="card">
       <div class="card-title">Сумма задолженностей</div>
