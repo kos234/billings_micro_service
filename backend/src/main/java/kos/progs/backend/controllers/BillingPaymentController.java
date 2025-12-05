@@ -1,45 +1,94 @@
 package kos.progs.backend.controllers;
 
 import kos.progs.backend.consts.BillingStates;
+import kos.progs.backend.dto.GetInvoicesDTO;
+import kos.progs.backend.dto.GetPaymentsDTO;
+import kos.progs.backend.dto.PageInfoDTO;
+import kos.progs.backend.dto.QueryFromServerDTO;
 import kos.progs.backend.entity.Billing;
 import kos.progs.backend.entity.Payment;
+import kos.progs.backend.entity.RegisteredService;
 import kos.progs.backend.model.Result;
+import kos.progs.backend.service.AccountService;
 import kos.progs.backend.service.BillingsService;
 import kos.progs.backend.service.PaymentService;
+import kos.progs.backend.service.RegisterServicesService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api")
 @RequiredArgsConstructor
+@Slf4j
 public class BillingPaymentController {
-
+    private final AccountService accountService;
     private final BillingsService billingsService;
     private final PaymentService paymentService;
+    private final RegisterServicesService registerServicesService;
+
+    @PostMapping("/accounts/main")
+    public ResponseEntity<?> getMainInfo(@AuthenticationPrincipal Jwt jwt) {
+        int userId = Integer.parseInt(jwt.getSubject());
+
+        var accountWrapper = accountService.getAccountByUserId(userId);
+        if (accountWrapper.isFailure())
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(accountWrapper.error().message());
+
+        var debt = billingsService.getUserDebt(userId);
+
+        var pageInfo = new PageInfoDTO();
+        pageInfo.setDebt(debt);
+        pageInfo.setBalance(accountWrapper.get().getBalance());
+        return ResponseEntity.ok(pageInfo);
+    }
 
 
     @GetMapping("/accounts/{userId}/invoices")
-    public ResponseEntity<?> getInvoices(
-            @PathVariable int userId,
-            @RequestParam(required = false) List<Integer> serviceId,
-            @RequestParam(required = false) List<String> states) {
+    @PostMapping("/accounts/{userId}/invoices")
+    public ResponseEntity<?> getInvoices(@PathVariable int userId, QueryFromServerDTO<GetInvoicesDTO> queryFromServerDTO) {
+        if(!registerServicesService.hasRegisteredServiceById(queryFromServerDTO.getServerId()))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Сервис не зарегистрирован");
 
-        List<BillingStates> billingStates = (states == null) ? List.of() :
-                states.stream()
-                        .map(String::toUpperCase)
-                        .map(BillingStates::valueOf)
-                        .collect(Collectors.toList());
+        var statesWrapper = billingsService.parseStatesFromString(queryFromServerDTO.getData().getStates());
+        if (statesWrapper.isFailure())
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(statesWrapper.error().message());
 
-        List<Billing> billings = billingsService.getBillings(userId, serviceId, billingStates);
+        List<Billing> billings = billingsService.getBillings(userId, queryFromServerDTO.getData().getServiceId(), statesWrapper.get());
         return ResponseEntity.ok(billings);
+    }
+
+
+    @PostMapping("/accounts/invoices")
+    public ResponseEntity<?> getInvoices(@AuthenticationPrincipal Jwt jwt, GetInvoicesDTO getInvoicesDTO) {
+        int userId = Integer.parseInt(jwt.getSubject());
+
+        var statesWrapper = billingsService.parseStatesFromString(getInvoicesDTO.getStates());
+        if (statesWrapper.isFailure())
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(statesWrapper.error().message());
+
+
+        List<Billing> billings = billingsService.getBillings(userId, getInvoicesDTO.getServiceId(), statesWrapper.get());
+        return ResponseEntity.ok(billings);
+    }
+
+    @PostMapping("/payments/all")
+    public ResponseEntity<?> getPayments(@AuthenticationPrincipal Jwt jwt, GetPaymentsDTO getPaymentsDTO) {
+        int userId = Integer.parseInt(jwt.getSubject());
+
+        List<Payment> payments = paymentService.getPayments(userId, getPaymentsDTO.getAfter(), getPaymentsDTO.getBefore());
+        return ResponseEntity.ok(payments);
     }
 
 
@@ -93,21 +142,8 @@ public class BillingPaymentController {
     }
 
 
- //   @PostMapping("/payments/webhook/success")
- //   public ResponseEntity<?> handleWebhook(@RequestBody Map<String, Object> payload) {
- //       // А что здесь я не знаваю
- //   }
-
-    @GetMapping("/payments")
-    public ResponseEntity<?> getPayments(
-            @RequestParam int userId,
-            @RequestParam(required = false) Long before,
-            @RequestParam(required = false) Long after) {
-
-        Instant beforeInstant = (before != null) ? Instant.ofEpochMilli(before) : Instant.now();
-        Instant afterInstant = (after != null) ? Instant.ofEpochMilli(after) : Instant.EPOCH;
-
-        List<Payment> payments = paymentService.getPayments(userId, beforeInstant, afterInstant);
-        return ResponseEntity.ok(payments);
-    }
+    //   @PostMapping("/payments/webhook/success")
+    //   public ResponseEntity<?> handleWebhook(@RequestBody Map<String, Object> payload) {
+    //       // А что здесь я не знаваю
+    //   }
 }

@@ -16,6 +16,10 @@ public class RegisterServicesService {
         return jpaRegisteredServiceRepository.findById(id);
     }
 
+    public boolean hasRegisteredServiceById(int id){
+        return jpaRegisteredServiceRepository.existsById(id);
+    }
+
     public void registerService(RegisteredService registeredService){
         jpaRegisteredServiceRepository.save(registeredService);
     }

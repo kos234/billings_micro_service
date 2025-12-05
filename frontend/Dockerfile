@@ -1,4 +1,5 @@
 FROM node:20 AS build-stage
+ENV VITE_IS_DOCKER=true
 
 WORKDIR /app
 

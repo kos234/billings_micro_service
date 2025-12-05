@@ -25,8 +25,8 @@ public class PaymentService {
     private final JPAPaymentRepository jpaPaymentRepository;
 
     @Transactional
-    public Result<Payment> addRefillBalance(int userId, BigDecimal amount){
-        if(amount.compareTo(BigDecimal.ZERO) <= 0)
+    public Result<Payment> addRefillBalance(int userId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0)
             return Result.failure(AccountErrors.AMOUNT_LESS_OR_EQUAL_ZERO.name(), "amount меньше либо равно 0");
         Payment payment = Payment.builder()
                 .uuid(UUID.randomUUID())
@@ -41,24 +41,24 @@ public class PaymentService {
     }
 
     @Transactional
-    public Result<Payment> addPayBilling(int userId, UUID billingUUID){
+    public Result<Payment> addPayBilling(int userId, UUID billingUUID) {
         var accountResult = accountService.getAccountByUserId(userId);
-        if(accountResult.isFailure())
-            return Result.failure(((Result.Failure<Account>)accountResult).code(), ((Result.Failure<Account>)accountResult).message());
+        if (accountResult.isFailure())
+            return Result.failure(((Result.Failure<Account>) accountResult).code(), ((Result.Failure<Account>) accountResult).message());
 
         BigDecimal balance = accountResult.get().getBalance();
 
-        if(balance.compareTo(BigDecimal.ZERO) <= 0)
+        if (balance.compareTo(BigDecimal.ZERO) <= 0)
             return Result.failure(AccountErrors.AMOUNT_LESS_OR_EQUAL_ZERO.name(), "amount меньше либо равно 0");
 
         Result<Billing> billingWrapper = billingsService.findById(billingUUID);
-        if(billingWrapper.isFailure())
-            return Result.failure(((Result.Failure<Billing>)billingWrapper).code(), ((Result.Failure<Billing>)billingWrapper).message());
+        if (billingWrapper.isFailure())
+            return Result.failure(((Result.Failure<Billing>) billingWrapper).code(), ((Result.Failure<Billing>) billingWrapper).message());
 
 
         Result<Boolean> canPaid = billingsService.canBillingPaid(billingWrapper.get(), balance);
-        if(canPaid.isFailure())
-            return Result.failure(((Result.Failure<Boolean>)canPaid).code(), ((Result.Failure<Boolean>)canPaid).message());
+        if (canPaid.isFailure())
+            return Result.failure(((Result.Failure<Boolean>) canPaid).code(), ((Result.Failure<Boolean>) canPaid).message());
 
         var amount = billingWrapper.get().getAmount().multiply(BigDecimal.valueOf(-1));
         Payment payment = Payment.builder()
@@ -76,11 +76,22 @@ public class PaymentService {
         return Result.success(payment);
     }
 
-    public List<Payment> getPayments(int userId, Instant before, Instant after){
-        return jpaPaymentRepository.findAllByUserIdAndCreatedAtAfterAndCreatedAtBefore(userId, before, after);
+    public List<Payment> getPayments(int userId, Instant after, Instant before) {
+        if (after == null)
+            after = Instant.EPOCH;
+        if (before == null)
+            before = Instant.now();
+
+        if(after.compareTo(before) > 0){
+            var tmp = after;
+            after = before;
+            before = tmp;
+        }
+
+        return jpaPaymentRepository.findAllByUserIdAndCreatedAtAfterAndCreatedAtBefore(userId, after, before);
     }
 
-    public enum AccountErrors{
+    public enum AccountErrors {
         AMOUNT_LESS_OR_EQUAL_ZERO
     }
 }
